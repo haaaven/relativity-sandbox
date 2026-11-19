@@ -107,3 +107,32 @@ details.reveal > .ans { padding: 2px 10px 8px; font-size: 12.8px; border-top: 1p
 .fcard td.f { font-family: "Cambria Math", Cambria, Georgia, serif; font-size: 14px; width: 60%; }
 pre.err { color: var(--bad); white-space: pre-wrap; padding: 10px; }
 a.tablink { color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+/* ---------------------------------------------------------------- phones / narrow screens
+   Canvases stack on top, controls below; the page scrolls. Canvases capture touches
+   (drag, pinch-zoom), so a gutter on the right is left free for scrolling with a thumb. */
+@media (max-width: 820px) {
+  html, body { font-size: 14px; }
+  header { padding: 5px 6px; gap: 6px; }
+  header h1 span { display: none; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .tabs button { flex: 0 0 auto; padding: 7px 10px; }
+  #tests-badge { display: none; }
+  #main { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .panel.active { display: block; height: auto; }
+  .main { overflow: visible; padding: 6px 30px 6px 6px; gap: 8px; background: repeating-linear-gradient(0deg, transparent 0 20px, rgba(0,0,0,.03) 20px 22px) right / 24px 100% no-repeat; }
+  .main .row { flex-direction: column; flex: none !important; }
+  .cv { flex: none !important; height: 62vh; min-height: 300px; }
+  .cv[style*="height:"] { min-height: 0; }
+  .cv-title { font-size: 11px; max-width: 90%; }
+  .side { border-left: 0; border-top: 1px solid var(--line); padding: 6px 12px 80px; overflow: visible; }
+  .ctrl { grid-template-columns: 96px minmax(0, 1fr) 64px; gap: 4px; }
+  .ctrl input[type=range] { height: 28px; }
+  .ctrl input[type=number] { width: 64px; }
+  .sel { grid-template-columns: 96px 1fr; }
+  .chkgrid { grid-template-columns: 1fr; }
+  .chk { padding: 3px 0; }
+  .btns button, .seg button { padding: 6px 10px; }
+  .fgrid { grid-template-columns: 1fr; }
+  .doc-inner { padding: 10px 10px 80px; }
+}

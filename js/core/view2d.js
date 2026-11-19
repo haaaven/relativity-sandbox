@@ -75,8 +75,10 @@
     _bind() {
       const cv = this.canvas;
       const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+      const touches = new Map();      // active pointers, for pinch-zoom on phones
+      let pinch = null, lastType = 'mouse';
       const pick = (sx, sy) => {
-        let best = null, bestD = 11;
+        let best = null, bestD = lastType === 'touch' ? 24 : 11;   // fingers need bigger targets
         for (let i = this.draggables.length - 1; i >= 0; i--) {
           const d = this.draggables[i];
           if (d.enabled === false || (typeof d.enabled === 'function' && !d.enabled())) continue;
@@ -87,8 +89,18 @@
       };
       cv.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
+        lastType = e.pointerType;
         const [sx, sy] = pos(e);
         cv.setPointerCapture(e.pointerId);
+        touches.set(e.pointerId, [sx, sy]);
+        if (touches.size === 2) {          // second finger: switch from drag/pan to pinch-zoom
+          if (this._drag && this._drag.kind === 'item' && this._drag.item.end) this._drag.item.end();
+          this._drag = null;
+          const [a, b] = [...touches.values()];
+          pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, box: Object.assign({}, this.box), mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2 };
+          return;
+        }
+        if (touches.size > 2) return;
         const it = pick(sx, sy);
         if (it) { this._drag = { kind: 'item', item: it, sx, sy, moved: false }; it.start && it.start(this.wx(sx), this.wy(sy), e); }
         else if (this.pannable) this._drag = { kind: 'pan', sx, sy, box: Object.assign({}, this.box), moved: false };
@@ -96,7 +108,25 @@
       });
       cv.addEventListener('pointermove', e => {
         const [sx, sy] = pos(e);
-        this.mouse = { sx, sy, wx: this.wx(sx), wy: this.wy(sy) };
+        if (touches.has(e.pointerId)) touches.set(e.pointerId, [sx, sy]);
+        if (pinch && touches.size >= 2) {
+          if (!this.zoomable) return;
+          const [a, b] = [...touches.values()];
+          const f = pinch.d0 / (Math.hypot(a[0] - b[0], a[1] - b[1]) || 1);
+          const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+          // zoom about the initial midpoint, then follow the midpoint (two-finger pan)
+          const bx = pinch.box, kx0 = this.kx, ky0 = this.ky;
+          this.box = bx; this._fit();
+          const wx = this.wx(pinch.mx), wy = this.wy(pinch.my);
+          const nb = { xmin: wx + (bx.xmin - wx) * f, xmax: wx + (bx.xmax - wx) * f, ymin: wy + (bx.ymin - wy) * f, ymax: wy + (bx.ymax - wy) * f };
+          this.box = nb; this._fit();
+          const dx = (mx - pinch.mx) / this.kx, dy = (my - pinch.my) / this.ky;
+          this.box = { xmin: nb.xmin - dx, xmax: nb.xmax - dx, ymin: nb.ymin + dy, ymax: nb.ymax + dy };
+          this._fit(); this.requestDraw();
+          this.onViewChange && this.onViewChange();
+          return;
+        }
+        this.mouse = e.pointerType === 'touch' && !this._drag ? null : { sx, sy, wx: this.wx(sx), wy: this.wy(sy) };
         const d = this._drag;
         if (d) {
           if (Math.hypot(sx - d.sx, sy - d.sy) > 3) d.moved = true;
@@ -113,7 +143,13 @@
           if (this.onHover) this.onHover(this.mouse);
         }
       });
+      const release = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+      cv.addEventListener('pointercancel', e => { release(e); this._drag = null; });
       cv.addEventListener('pointerup', e => {
+        const wasPinch = !!pinch;
+        release(e);
+        if (wasPinch) { this._drag = null; return; }
+        if (e.pointerType === 'touch') this.mouse = null;
         const d = this._drag; this._drag = null;
         if (!d) return;
         if (d.kind === 'item' && d.item.end) d.item.end();
